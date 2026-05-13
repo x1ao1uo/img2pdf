@@ -1,0 +1,10 @@
+[package]
+name = "img2pdf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+printpdf = "0.9.1"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
+walkdir = "2.5.0"
+chrono = "0.4.44"
