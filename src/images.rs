@@ -3,20 +3,18 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use walkdir::WalkDir;
+const IMAGES_PER_PDF: usize = 4;
 
 #[derive(Debug, Clone)]
 pub struct ImageGroup {
     pub name: String,
-    #[allow(dead_code)]
-    pub dir: PathBuf,
     pub files: Vec<PathBuf>,
 }
 
-pub fn discover_groups(root: &Path, recursive: bool) -> Result<Vec<ImageGroup>, Box<dyn Error>> {
+pub fn discover_groups(root: &Path) -> Result<Vec<ImageGroup>, Box<dyn Error>> {
     let clean_root = clean_root_dir(root)?;
-    let files = discover_image_files(&clean_root, recursive)?;
-    Ok(build_groups(&clean_root, files))
+    let dirs = discover_group_dirs(&clean_root)?;
+    build_groups(dirs)
 }
 
 fn is_supported_image(path: &Path) -> bool {
@@ -36,30 +34,22 @@ fn clean_root_dir(root: &Path) -> Result<PathBuf, Box<dyn Error>> {
     Ok(clean_root)
 }
 
-fn discover_image_files(root: &Path, recursive: bool) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-    if recursive {
-        walk_image_files(root)
-    } else {
-        read_root_image_files(root)
-    }
-}
-
-fn walk_image_files(root: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-    let mut files = Vec::new();
-    for entry in WalkDir::new(root) {
+fn discover_group_dirs(root: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    let mut dirs = Vec::new();
+    for entry in fs::read_dir(root)? {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() && is_supported_image(path) {
-            files.push(path.to_path_buf());
+        if path.is_dir() {
+            dirs.push(path);
         }
     }
-    files.sort();
-    Ok(files)
+    dirs.sort();
+    Ok(dirs)
 }
 
-fn read_root_image_files(root: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+fn read_dir_image_files(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     let mut files = Vec::new();
-    for entry in fs::read_dir(root)? {
+    for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_file() && is_supported_image(&path) {
@@ -70,51 +60,43 @@ fn read_root_image_files(root: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     Ok(files)
 }
 
-fn build_groups(root: &Path, files: Vec<PathBuf>) -> Vec<ImageGroup> {
-    let mut by_dir: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
-    for file in files {
-        let dir = file.parent().unwrap_or(Path::new("")).to_path_buf();
-        by_dir.entry(dir).or_default().push(file);
-    }
-
-    let mut dirs: Vec<PathBuf> = by_dir.keys().cloned().collect();
-    dirs.sort();
-
+fn build_groups(dirs: Vec<PathBuf>) -> Result<Vec<ImageGroup>, Box<dyn Error>> {
     let mut used_names: HashMap<String, i32> = HashMap::new();
     let mut groups = Vec::new();
 
     for dir in dirs {
-        let mut group_files = by_dir.remove(&dir).unwrap_or_default();
-        group_files.sort();
+        let group_files = read_dir_image_files(&dir)?;
+        if group_files.is_empty() {
+            continue;
+        }
+        let base_name = group_name(&dir);
 
-        let name = unique_group_name(group_name(root, &dir), &mut used_names);
-        groups.push(ImageGroup {
-            name,
-            dir: dir.clone(),
-            files: group_files,
-        });
+        for (chunk_index, chunk) in group_files.chunks(IMAGES_PER_PDF).enumerate() {
+            let name = unique_group_name(pdf_group_name(&base_name, chunk_index), &mut used_names);
+            groups.push(ImageGroup {
+                name,
+                files: chunk.to_vec(),
+            });
+        }
     }
 
-    groups
+    Ok(groups)
 }
 
-fn group_name(root: &Path, dir: &Path) -> String {
-    let rel = dir
-        .strip_prefix(root)
-        .ok()
-        .and_then(|p| p.to_str())
-        .unwrap_or("");
+fn group_name(dir: &Path) -> String {
+    let name = dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("images");
+    safe_name(name)
+}
 
-    let name = if rel.is_empty() || rel == "." {
-        dir.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("images")
-            .to_string()
+fn pdf_group_name(base_name: &str, chunk_index: usize) -> String {
+    if chunk_index == 0 {
+        base_name.to_string()
     } else {
-        rel.replace(['/', '\\'], "_")
-    };
-
-    safe_name(&name)
+        format!("{}{}", base_name, chunk_index + 1)
+    }
 }
 
 fn safe_name(name: &str) -> String {
@@ -151,5 +133,116 @@ fn replace_unsafe_rune(r: char) -> char {
         '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
         _ if r.is_control() => '\0',
         _ => r,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct TempDir {
+        path: PathBuf,
+    }
+
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after Unix epoch")
+                .as_nanos();
+            let path =
+                std::env::temp_dir().join(format!("img2pdf-{name}-{}-{now}", std::process::id()));
+            fs::create_dir_all(&path).expect("temp dir should be created");
+            Self { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn discover_groups_splits_sorted_images_into_four_image_pdf_groups() {
+        let temp = TempDir::new("chunked-groups");
+        let group_dir = temp.path().join("group-a");
+        fs::create_dir_all(&group_dir).expect("group dir should be created");
+        for name in [
+            "09.jpg", "01.jpg", "03.png", "02.jpeg", "04.jpg", "08.png", "05.jpg", "07.jpeg",
+            "06.jpg",
+        ] {
+            fs::write(group_dir.join(name), []).expect("test image placeholder should be written");
+        }
+
+        let groups = discover_groups(temp.path()).expect("groups should be discovered");
+
+        assert_eq!(groups.len(), 3);
+        let names: Vec<_> = groups.iter().map(|group| group.name.as_str()).collect();
+        assert_eq!(names, ["group-a", "group-a2", "group-a3"]);
+
+        let chunk_file_names: Vec<Vec<_>> = groups
+            .iter()
+            .map(|group| {
+                group
+                    .files
+                    .iter()
+                    .map(|path| path.file_name().and_then(|name| name.to_str()).unwrap())
+                    .collect()
+            })
+            .collect();
+        assert_eq!(
+            chunk_file_names,
+            [
+                vec!["01.jpg", "02.jpeg", "03.png", "04.jpg"],
+                vec!["05.jpg", "06.jpg", "07.jpeg", "08.png"],
+                vec!["09.jpg"],
+            ]
+        );
+    }
+
+    #[test]
+    fn discover_groups_uses_directory_basename_for_pdf_names() {
+        let temp = TempDir::new("basename");
+        for dir in ["a:b", "a?b"] {
+            let dir_path = temp.path().join(dir);
+            fs::create_dir_all(&dir_path).expect("image dir should be created");
+            fs::write(dir_path.join("01.jpg"), [])
+                .expect("test image placeholder should be written");
+        }
+
+        let groups = discover_groups(temp.path()).expect("groups should be discovered");
+        let names: Vec<_> = groups.iter().map(|group| group.name.as_str()).collect();
+
+        assert_eq!(names, ["a_b", "a_b_2"]);
+    }
+
+    #[test]
+    fn discover_groups_ignores_root_images_and_nested_directories() {
+        let temp = TempDir::new("direct-children-only");
+        fs::write(temp.path().join("root.jpg"), [])
+            .expect("root image placeholder should be written");
+
+        let group_dir = temp.path().join("group-a");
+        fs::create_dir_all(group_dir.join("nested")).expect("nested dir should be created");
+        fs::write(group_dir.join("01.jpg"), []).expect("group image placeholder should be written");
+        fs::write(group_dir.join("nested").join("02.jpg"), [])
+            .expect("nested image placeholder should be written");
+
+        let groups = discover_groups(temp.path()).expect("groups should be discovered");
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].name, "group-a");
+        let file_names: Vec<_> = groups[0]
+            .files
+            .iter()
+            .map(|path| path.file_name().and_then(|name| name.to_str()).unwrap())
+            .collect();
+        assert_eq!(file_names, ["01.jpg"]);
     }
 }

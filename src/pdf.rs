@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-use image::GenericImageView;
+use ::image::GenericImageView;
 use printpdf::*;
 
 const IMAGES_PER_PAGE: usize = 4;
@@ -138,12 +138,16 @@ fn pt_to_mm(pt: f32) -> Mm {
 }
 
 fn get_image_size(path: &Path) -> Result<ImageSize, Box<dyn Error>> {
-    let img = image::open(path)?;
+    let img = ::image::open(path)?;
     let (width, height) = img.dimensions();
     Ok(ImageSize {
         w: width as f32,
         h: height as f32,
     })
+}
+
+fn first_page_images<T>(image_paths: &[T]) -> &[T] {
+    &image_paths[..usize::min(image_paths.len(), IMAGES_PER_PAGE)]
 }
 
 pub fn write_image_grid_pdf(
@@ -165,43 +169,34 @@ pub fn write_image_grid_pdf(
     let slots = layout.image_slots();
 
     let mut doc = PdfDocument::new("img2pdf");
-    let mut pages = Vec::new();
+    let mut page_ops: Vec<Op> = Vec::new();
 
-    for page_images in image_paths.chunks(IMAGES_PER_PAGE) {
-        let mut page_ops: Vec<Op> = Vec::new();
+    for (index, image_path) in first_page_images(image_paths).iter().enumerate() {
+        let image_path = image_path.as_ref();
+        let slot = slots[index];
 
-        for (index, image_path) in page_images.iter().enumerate() {
-            if index >= slots.len() {
-                break;
-            }
-            let image_path = image_path.as_ref();
-            let slot = slots[index];
+        let img_size = get_image_size(image_path)?;
+        let fit = fit_rect(img_size, slot);
 
-            let img_size = get_image_size(image_path)?;
-            let fit = fit_rect(img_size, slot);
+        let image_bytes = fs::read(image_path)?;
+        let mut warnings = Vec::new();
+        let image = RawImage::decode_from_bytes(&image_bytes, &mut warnings)?;
 
-            let image_bytes = fs::read(image_path)?;
-            let mut warnings = Vec::new();
-            let image = RawImage::decode_from_bytes(&image_bytes, &mut warnings)?;
+        let image_xobject_id = doc.add_image(&image);
 
-            let image_xobject_id = doc.add_image(&image);
-
-            page_ops.push(Op::UseXobject {
-                id: image_xobject_id,
-                transform: XObjectTransform {
-                    translate_x: Some(Pt(fit.x * 0.75)),
-                    translate_y: Some(Pt(fit.y * 0.75)),
-                    scale_x: Some(fit.w / img_size.w),
-                    scale_y: Some(fit.h / img_size.h),
-                    ..XObjectTransform::default()
-                },
-            });
-        }
-
-        pages.push(PdfPage::new(page_width_mm, page_height_mm, page_ops));
+        page_ops.push(Op::UseXobject {
+            id: image_xobject_id,
+            transform: XObjectTransform {
+                translate_x: Some(Pt(fit.x * 0.75)),
+                translate_y: Some(Pt(fit.y * 0.75)),
+                scale_x: Some(fit.w / img_size.w),
+                scale_y: Some(fit.h / img_size.h),
+                ..XObjectTransform::default()
+            },
+        });
     }
 
-    doc.with_pages(pages);
+    doc.with_pages(vec![PdfPage::new(page_width_mm, page_height_mm, page_ops)]);
 
     let mut warnings = Vec::new();
     let pdf_bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
@@ -213,4 +208,109 @@ pub fn write_image_grid_pdf(
     fs::write(output_path, &pdf_bytes)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ::image::{ImageBuffer, Rgb};
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct TempDir {
+        path: PathBuf,
+    }
+
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after Unix epoch")
+                .as_nanos();
+            let path =
+                std::env::temp_dir().join(format!("img2pdf-{name}-{}-{now}", std::process::id()));
+            fs::create_dir_all(&path).expect("temp dir should be created");
+            Self { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn write_test_png(path: &Path, color: [u8; 3]) {
+        let image = ImageBuffer::from_pixel(8, 8, Rgb(color));
+        image.save(path).expect("test PNG should be written");
+    }
+
+    #[test]
+    fn a4_grid_layout_always_has_four_slots() {
+        let layout = A4GridLayout::new(LayoutOptions::default());
+
+        assert_eq!(layout.image_slots().len(), 4);
+    }
+
+    #[test]
+    fn first_page_images_uses_at_most_four_images() {
+        let images = [1, 2, 3, 4, 5];
+
+        assert_eq!(first_page_images(&images), &[1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn first_page_images_keeps_short_input_for_empty_slots() {
+        let images = [1, 2];
+
+        assert_eq!(first_page_images(&images), &[1, 2]);
+    }
+
+    #[test]
+    fn write_image_grid_pdf_uses_one_page_for_more_than_four_images() {
+        let temp = TempDir::new("one-page");
+        let mut images = Vec::new();
+        for index in 0..5 {
+            let path = temp.path().join(format!("{index}.png"));
+            write_test_png(&path, [index * 20, 0, 0]);
+            images.push(path);
+        }
+        let output = temp.path().join("out.pdf");
+
+        write_image_grid_pdf(&output, "test", &images).expect("PDF should be written");
+
+        let pdf = lopdf::Document::load(&output).expect("PDF should be readable");
+        assert_eq!(pdf.get_pages().len(), 1);
+        let page_id = *pdf.get_pages().get(&1).expect("first page should exist");
+        assert_eq!(
+            pdf.get_page_images(page_id)
+                .expect("page images should be readable")
+                .len(),
+            4
+        );
+    }
+
+    #[test]
+    fn write_image_grid_pdf_keeps_empty_slots_when_only_one_image_exists() {
+        let temp = TempDir::new("one-image");
+        let image = temp.path().join("0.png");
+        write_test_png(&image, [255, 0, 0]);
+        let output = temp.path().join("out.pdf");
+
+        write_image_grid_pdf(&output, "test", &[image]).expect("PDF should be written");
+
+        let pdf = lopdf::Document::load(&output).expect("PDF should be readable");
+        assert_eq!(pdf.get_pages().len(), 1);
+        let page_id = *pdf.get_pages().get(&1).expect("first page should exist");
+        assert_eq!(
+            pdf.get_page_images(page_id)
+                .expect("page images should be readable")
+                .len(),
+            1
+        );
+    }
 }

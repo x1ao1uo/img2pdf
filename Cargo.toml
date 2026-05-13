@@ -1,10 +1,20 @@
 [package]
 name = "img2pdf"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+authors = ["x1ao1uo <sogura@qq.com>"]
+license = "MIT"
+readme = "README.md"
+description = "Fixed A4 2x2 image grid PDF batch tool"
+homepage = "https://github.com/x1ao1uo/img2pdf"
+repository = "https://github.com/x1ao1uo/img2pdf"
+keywords = ["image", "pdf", "a4", "grid"]
+categories = ["command-line-utilities"]
 
 [dependencies]
-printpdf = "0.9.1"
+printpdf = { version = "0.9.1", default-features = false, features = ["jpeg", "png"] }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
-walkdir = "2.5.0"
 chrono = "0.4.44"
+
+[dev-dependencies]
+lopdf = { version = "=0.39.0", default-features = false }

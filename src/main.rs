@@ -25,21 +25,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         default_output_dir()
     };
 
-    let recursive = true;
-
-    println!("扫描目录: {}", input_dir.display());
+    println!("扫描分组根目录: {}", input_dir.display());
     println!("输出目录: {}", output_dir.display());
 
-    let groups = discover_groups(&input_dir, recursive)?;
+    let groups = discover_groups(&input_dir)?;
 
     if groups.is_empty() {
-        println!("未找到可转换的图片。");
+        println!("未在直接子目录中找到可转换的图片。");
         return Ok(());
     }
 
     let total_images: usize = groups.iter().map(|g| g.files.len()).sum();
     println!(
-        "找到 {} 组图片，共 {} 张图片，开始转换...",
+        "找到 {} 个 PDF 分组，共 {} 张图片，开始转换...",
         groups.len(),
         total_images
     );
