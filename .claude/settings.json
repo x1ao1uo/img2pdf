@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "respectGitignore": true,
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "LSP",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(ls*)"
+    ],
+    "ask": [
+      "Bash(git push*)",
+      "Bash(git clean*)",
+      "Bash(git reset*)",
+      "Bash(git checkout --*)",
+      "Bash(rm *)",
+      "Bash(rm -r*)",
+      "Bash(rm -rf*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~*)",
+      "Bash(rm -rf $HOME*)",
+      "Bash(sudo rm*)"
+    ]
+  }
+}
