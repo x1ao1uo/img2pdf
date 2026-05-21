@@ -10,7 +10,12 @@
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",
-      "Bash(ls*)"
+      "Bash(ls*)",
+      "Bash(cargo fmt*)",
+      "Bash(cargo check*)",
+      "Bash(cargo clippy*)",
+      "Bash(cargo test*)",
+      "Bash(cargo tree*)"
     ],
     "ask": [
       "Bash(git push*)",
@@ -19,13 +24,31 @@
       "Bash(git checkout --*)",
       "Bash(rm *)",
       "Bash(rm -r*)",
-      "Bash(rm -rf*)"
+      "Bash(rm -rf*)",
+      "Bash(cargo run*)",
+      "Bash(cargo build --release*)",
+      "Bash(cargo publish*)"
     ],
     "deny": [
       "Bash(rm -rf /)",
       "Bash(rm -rf ~*)",
       "Bash(rm -rf $HOME*)",
       "Bash(sudo rm*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "script=; dir=\"$PWD\"; while [ \"$dir\" != / ]; do if [ -f \"$dir/.claude/hooks/claude-code-setup-hint.py\" ]; then script=\"$dir/.claude/hooks/claude-code-setup-hint.py\"; break; fi; dir=\"$(dirname \"$dir\")\"; done; if [ -n \"$script\" ]; then python3 \"$script\"; fi # claude-code-setup-verify-hint",
+            "timeout": 5,
+            "statusMessage": "Suggesting project verification"
+          }
+        ]
+      }
     ]
   }
 }
