@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+# 中文说明：该处用于补充脚本维护意图。
+"""Python 辅助脚本模块，负责执行项目自动化或维护流程。
+
+本模块中的注释使用中文描述用途、参数和返回值，便于维护。
+"""
+
 import json
 import os
 import sys
