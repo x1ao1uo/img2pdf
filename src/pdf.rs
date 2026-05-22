@@ -1,3 +1,7 @@
+//! PDF 模块，负责 PDF 文档生成与页面组织。
+//!
+//! 本模块中的注释使用中文描述用途、参数和返回值，便于维护。
+
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -8,24 +12,37 @@ use printpdf::*;
 const IMAGES_PER_PAGE: usize = 4;
 
 #[derive(Debug, Clone, Copy)]
+/// `Rect` 结构体，保存当前模块相关业务数据。
 pub struct Rect {
+    /// `x` 字段，存储对应业务数据。
     pub x: f32,
+    /// `y` 字段，存储对应业务数据。
     pub y: f32,
+    /// `w` 字段，存储对应业务数据。
     pub w: f32,
+    /// `h` 字段，存储对应业务数据。
     pub h: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
+/// `ImageSize` 结构体，保存当前模块相关业务数据。
 pub struct ImageSize {
+    /// `w` 字段，存储对应业务数据。
     pub w: f32,
+    /// `h` 字段，存储对应业务数据。
     pub h: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
+/// `LayoutOptions` 结构体，保存当前模块相关业务数据。
 pub struct LayoutOptions {
+    /// `page_width` 字段，存储对应业务数据。
     pub page_width: f32,
+    /// `page_height` 字段，存储对应业务数据。
     pub page_height: f32,
+    /// `margin` 字段，存储对应业务数据。
     pub margin: f32,
+    /// `gap` 字段，存储对应业务数据。
     pub gap: f32,
 }
 
@@ -40,17 +57,29 @@ impl Default for LayoutOptions {
     }
 }
 
+/// `A4GridLayout` 结构体，保存当前模块相关业务数据。
 pub struct A4GridLayout {
     options: LayoutOptions,
 }
 
 impl A4GridLayout {
+    /// 创建新的实例。
+    ///
+    /// # 参数
+    /// - `options`: 函数签名中定义的业务参数。
+    ///
+    /// # 返回
+    /// 返回 `Self`，错误时按函数签名中的错误类型向上透传。
     pub fn new(options: LayoutOptions) -> Self {
         Self {
             options: normalize_layout_options(options),
         }
     }
 
+    /// 执行 `image_slots` 操作，封装当前模块的业务流程。
+    ///
+    /// # 返回
+    /// 返回 `[Rect`，错误时按函数签名中的错误类型向上透传。
     pub fn image_slots(&self) -> [Rect; IMAGES_PER_PAGE] {
         let options = self.options;
         let slot_width = (options.page_width - 2.0 * options.margin - options.gap) / 2.0;
@@ -85,6 +114,13 @@ impl A4GridLayout {
     }
 }
 
+/// 执行 `fit_rect` 操作，封装当前模块的业务流程。
+///
+/// # 参数
+/// - `size`: 函数签名中定义的业务参数。
+///
+/// # 返回
+/// 返回 `Rect`，错误时按函数签名中的错误类型向上透传。
 pub fn fit_rect(size: ImageSize, r#box: Rect) -> Rect {
     if size.w <= 0.0 || size.h <= 0.0 || r#box.w <= 0.0 || r#box.h <= 0.0 {
         return Rect {
@@ -150,6 +186,15 @@ fn first_page_images<T>(image_paths: &[T]) -> &[T] {
     &image_paths[..usize::min(image_paths.len(), IMAGES_PER_PAGE)]
 }
 
+/// 执行 `write_image_grid_pdf` 操作，封装当前模块的业务流程。
+///
+/// # 参数
+/// - `output_path`: 函数签名中定义的业务参数。
+/// - `_title`: 函数签名中定义的业务参数。
+/// - `image_paths`: 函数签名中定义的业务参数。
+///
+/// # 返回
+/// 返回 `Result<(), Box<dyn Error>>`，错误时按函数签名中的错误类型向上透传。
 pub fn write_image_grid_pdf(
     output_path: &Path,
     _title: &str,

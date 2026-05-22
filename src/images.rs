@@ -1,3 +1,7 @@
+//! 图片模块，负责图片读取、排序和转换。
+//!
+//! 本模块中的注释使用中文描述用途、参数和返回值，便于维护。
+
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -6,11 +10,21 @@ use std::path::{Path, PathBuf};
 const IMAGES_PER_PDF: usize = 4;
 
 #[derive(Debug, Clone)]
+/// `ImageGroup` 结构体，保存当前模块相关业务数据。
 pub struct ImageGroup {
+    /// 名称字段，用于展示或识别业务对象。
     pub name: String,
+    /// `files` 字段，存储对应业务数据。
     pub files: Vec<PathBuf>,
 }
 
+/// 执行 `discover_groups` 操作，封装当前模块的业务流程。
+///
+/// # 参数
+/// - `root`: 函数签名中定义的业务参数。
+///
+/// # 返回
+/// 返回 `Result<Vec<ImageGroup>, Box<dyn Error>>`，错误时按函数签名中的错误类型向上透传。
 pub fn discover_groups(root: &Path) -> Result<Vec<ImageGroup>, Box<dyn Error>> {
     let clean_root = clean_root_dir(root)?;
     let dirs = discover_group_dirs(&clean_root)?;
