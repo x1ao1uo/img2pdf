@@ -24,9 +24,7 @@
     "andrej-karpathy-skills@karpathy-skills": true,
     "superpowers@claude-plugins-official": true
   },
-  "env": {
-    "CLAUDE_CODE_EFFORT_LEVEL": "max"
-  },
+
   "alwaysThinkingEnabled": true,
   "skipDangerousModePermissionPrompt": true,
   "extraKnownMarketplaces": {
