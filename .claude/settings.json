@@ -1,38 +1,28 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "respectGitignore": true,
   "permissions": {
     "defaultMode": "bypassPermissions"
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "script=; dir=\"$PWD\"; while [ \"$dir\" != / ]; do if [ -f \"$dir/.claude/hooks/claude-code-setup-hint.py\" ]; then script=\"$dir/.claude/hooks/claude-code-setup-hint.py\"; break; fi; dir=\"$(dirname \"$dir\")\"; done; if [ -n \"$script\" ]; then python3 \"$script\"; fi # claude-code-setup-verify-hint",
-            "timeout": 5,
-            "statusMessage": "Suggesting project verification"
-          }
-        ]
-      }
-    ]
   },
   "enabledPlugins": {
     "claude-code-setup@claude-plugins-official": true,
     "andrej-karpathy-skills@karpathy-skills": true,
-    "superpowers@claude-plugins-official": true
+    "superpowers@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true
   },
-
   "alwaysThinkingEnabled": true,
   "skipDangerousModePermissionPrompt": true,
-  "extraKnownMarketplaces": {
-    "karpathy-skills": {
-      "source": {
-        "source": "github",
-        "repo": "forrestchang/andrej-karpathy-skills"
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$CLAUDE_PROJECT_DIR\" 2>/dev/null || pwd; if [ -f Cargo.toml ]; then cargo fmt --all 2>&1 | tail -5; cargo clippy --fix --allow-no-vcs -- -A warnings 2>&1 | tail -5; fi'",
+            "timeout": 120
+          }
+        ]
       }
-    }
+    ]
   }
 }
