@@ -2,6 +2,8 @@
 //!
 //! 本模块中的注释使用中文描述用途、参数和返回值，便于维护。
 
+// 传递依赖版本冲突（hashbrown/wit-bindgen 等）由上游 crate 决定，本项目无法控制
+#![allow(clippy::multiple_crate_versions)]
 mod images;
 mod pdf;
 
@@ -52,12 +54,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("处理: {} ({} 张图片)", group.name, group.files.len());
 
         match write_image_grid_pdf(&output_path, &group.name, &group.files) {
-            Ok(_) => {
+            Ok(()) => {
                 success_count += 1;
                 println!("  ✓ 已生成: {}", output_path.display());
             }
             Err(e) => {
-                println!("  ✗ 失败: {}", e);
+                println!("  ✗ 失败: {e}");
             }
         }
     }

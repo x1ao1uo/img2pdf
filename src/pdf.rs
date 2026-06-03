@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 
 use ::image::GenericImageView;
-use printpdf::*;
+use printpdf::{Mm, PdfDocument, Op, RawImage, XObjectTransform, Pt, PdfPage, PdfSaveOptions};
 
 const IMAGES_PER_PAGE: usize = 4;
 
@@ -82,8 +82,8 @@ impl A4GridLayout {
     /// 返回 `[Rect`，错误时按函数签名中的错误类型向上透传。
     pub fn image_slots(&self) -> [Rect; IMAGES_PER_PAGE] {
         let options = self.options;
-        let slot_width = (options.page_width - 2.0 * options.margin - options.gap) / 2.0;
-        let slot_height = (options.page_height - 2.0 * options.margin - options.gap) / 2.0;
+        let slot_width = (2.0f32.mul_add(-options.margin, options.page_width) - options.gap) / 2.0;
+        let slot_height = (2.0f32.mul_add(-options.margin, options.page_height) - options.gap) / 2.0;
 
         [
             Rect {
@@ -100,13 +100,13 @@ impl A4GridLayout {
             },
             Rect {
                 x: options.margin,
-                y: options.page_height - options.margin - 2.0 * slot_height - options.gap,
+                y: 2.0f32.mul_add(-slot_height, options.page_height - options.margin) - options.gap,
                 w: slot_width,
                 h: slot_height,
             },
             Rect {
                 x: options.margin + slot_width + options.gap,
-                y: options.page_height - options.margin - 2.0 * slot_height - options.gap,
+                y: 2.0f32.mul_add(-slot_height, options.page_height - options.margin) - options.gap,
                 w: slot_width,
                 h: slot_height,
             },
@@ -201,7 +201,7 @@ pub fn write_image_grid_pdf(
     image_paths: &[impl AsRef<Path>],
 ) -> Result<(), Box<dyn Error>> {
     if image_paths.is_empty() {
-        return Err(format!("no images to write for {}", _title).into());
+        return Err(format!("no images to write for {_title}").into());
     }
 
     if let Some(parent) = output_path.parent() {
@@ -247,7 +247,7 @@ pub fn write_image_grid_pdf(
     let pdf_bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
 
     if !warnings.is_empty() {
-        eprintln!("PDF 生成警告: {:?}", warnings);
+        eprintln!("PDF 生成警告: {warnings:?}");
     }
 
     fs::write(output_path, &pdf_bytes)?;
