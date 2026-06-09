@@ -7,22 +7,16 @@
     "andrej-karpathy-skills@karpathy-skills": true,
     "superpowers@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
-    "rust-analyzer-lsp@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
   "skipDangerousModePermissionPrompt": true,
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -c \"import json,os,subprocess,sys;p=os.environ.get('CLAUDE_PROJECT_DIR') or os.getcwd();f=os.path.join(p,'Cargo.toml');import os.path as op;if op.isfile(f):  for cmd in (['cargo','fmt','--all'],['cargo','clippy','--fix','--allow-no-vcs','--','-A','warnings']):    r=subprocess.run(cmd,cwd=p,capture_output=True,text=True);    sys.stdout.write(r.stdout[-1000:]);    sys.stderr.write(r.stderr[-1000:])\""
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Read|Edit|Write|MultiEdit|Bash",
@@ -30,6 +24,17 @@
           {
             "type": "command",
             "command": "python3 -c \"import json,sys,re; p=json.load(sys.stdin).get('tool_input',{}).get('file_path',''); sys.exit(2 if re.search(r'(\\.env(\\.|$)|\\.pem$|\\.key$|\\.p12$|secrets\\.toml$|Cargo\\.lock$|id_rsa$|id_ed25519$)', p) else 0)\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/claude-code-setup-hint.py"
           }
         ]
       }
