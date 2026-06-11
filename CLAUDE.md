@@ -41,6 +41,7 @@
 - 不要"代用"不存在能力；无调用则明确说明。
 
 ## 6) GitHub 操作规范
+- `github-mcp-server` 已停用，统一用 `gh` CLI。
 - 优先使用 GitHub 官方 CLI（`gh`）。
 - `gh` 已通过本机 keyring 认证（`gh auth status` 可核验），默认不需要 PAT。
 - 常用命令映射：`gh pr view` / `gh issue view` / `gh repo view` / `gh pr create` / `gh pr merge` / `gh pr review` / `gh api`。
