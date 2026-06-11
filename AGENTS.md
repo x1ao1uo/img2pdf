@@ -43,7 +43,6 @@
 ## 6) GitHub 操作规范
 - 优先使用 GitHub 官方 CLI（`gh`）。
 - `gh` 已通过本机 keyring 认证（`gh auth status` 可核验），默认不需要 PAT。
-- `github-mcp-server` 一般需要 PAT，默认不启用。
 - 常用命令映射：`gh pr view` / `gh issue view` / `gh repo view` / `gh pr create` / `gh pr merge` / `gh pr review` / `gh api`。
 
 ## 7) Rust 通用约定
