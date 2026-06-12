@@ -1,12 +1,7 @@
 {
-  "permissions": {
-    "defaultMode": "bypassPermissions"
-  },
   "enabledPlugins": {
     "rust-analyzer-lsp@claude-plugins-official": true
   },
-  "alwaysThinkingEnabled": true,
-  "skipDangerousModePermissionPrompt": true,
   "hooks": {
     "PreToolUse": [
       {
