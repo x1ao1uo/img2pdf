@@ -3,15 +3,7 @@
     "defaultMode": "bypassPermissions"
   },
   "enabledPlugins": {
-    "claude-code-setup@claude-plugins-official": true,
-    "andrej-karpathy-skills@karpathy-skills": true,
-    "superpowers@claude-plugins-official": true,
-    "rust-analyzer-lsp@claude-plugins-official": true,
-    "commit-commands@claude-plugins-official": true,
-    "code-review@claude-plugins-official": true,
-    "code-simplifier@claude-plugins-official": true,
-    "pr-review-toolkit@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
   "skipDangerousModePermissionPrompt": true,
