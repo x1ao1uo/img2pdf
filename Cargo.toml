@@ -14,7 +14,7 @@ categories = ["command-line-utilities"]
 [dependencies]
 printpdf = { version = "0.9.1", default-features = false, features = ["jpeg", "png"] }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
-chrono = "0.4.44"
+chrono = "0.4.45"
 
 [dev-dependencies]
 lopdf = { version = "=0.40.0", default-features = false }
