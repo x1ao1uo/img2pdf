@@ -75,7 +75,7 @@
 | 加密 | `aes` / `md5` / `sha2` / `hex` / `base64`（直接依赖） |
 
 ## 10) Rust 共享工具库（按需引用）
-根目录的共享 crate（位于 `/Volumes/LVLIAN_1T/code/`）：
+根目录的共享 crate（位于 `D:\code\`）：
 
 | Crate | 用途 |
 |---|---|
