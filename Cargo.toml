@@ -17,4 +17,4 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 chrono = "0.4.45"
 
 [dev-dependencies]
-lopdf = { version = "=0.40.0", default-features = false }
+lopdf = { version = "=0.43.0", default-features = false }
