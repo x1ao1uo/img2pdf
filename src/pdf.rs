@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 
 use ::image::GenericImageView;
-use printpdf::{Mm, PdfDocument, Op, RawImage, XObjectTransform, Pt, PdfPage, PdfSaveOptions};
+use printpdf::{Mm, Op, PdfDocument, PdfPage, PdfSaveOptions, Pt, RawImage, XObjectTransform};
 
 const IMAGES_PER_PAGE: usize = 4;
 
@@ -83,7 +83,8 @@ impl A4GridLayout {
     pub fn image_slots(&self) -> [Rect; IMAGES_PER_PAGE] {
         let options = self.options;
         let slot_width = (2.0f32.mul_add(-options.margin, options.page_width) - options.gap) / 2.0;
-        let slot_height = (2.0f32.mul_add(-options.margin, options.page_height) - options.gap) / 2.0;
+        let slot_height =
+            (2.0f32.mul_add(-options.margin, options.page_height) - options.gap) / 2.0;
 
         [
             Rect {
