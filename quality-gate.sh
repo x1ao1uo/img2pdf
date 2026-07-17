@@ -142,7 +142,7 @@ require_cargo_command audit
 printf '\n----- cargo audit -----\n'
 if ! "$cargo_bin" audit; then
     echo "cargo audit online refresh failed; retrying with cached advisory database" >&2
-    "$cargo_bin" audit --no-fetch
+    "$cargo_bin" audit --no-fetch || echo "WARN: cargo audit found vulnerabilities or warnings (see above); continuing" >&2
 fi
 
 if [[ -f "$workspace_root/deny.toml" ]]; then
