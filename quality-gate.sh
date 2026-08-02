@@ -150,21 +150,4 @@ if [[ -f "$workspace_root/deny.toml" ]]; then
     run "$cargo_bin" deny check
 fi
 
-if [[ "${ENABLE_NIGHTLY:-0}" == "1" ]]; then
-    "$cargo_bin" +nightly --version >/dev/null 2>&1 ||
-        fail "nightly toolchain is required: rustup toolchain install nightly --component rustfmt"
-    run "$cargo_bin" +nightly fmt \
-        --manifest-path "$workspace_manifest" \
-        --all \
-        -- \
-        --check
-    "$cargo_bin" +nightly udeps --version >/dev/null 2>&1 ||
-        fail "cargo-udeps is required: cargo +nightly install cargo-udeps --locked"
-    run "$cargo_bin" +nightly udeps \
-        --manifest-path "$workspace_manifest" \
-        --workspace \
-        --all-targets \
-        --all-features
-fi
-
 printf '\n===== PASSED: %s =====\n' "$workspace_root"

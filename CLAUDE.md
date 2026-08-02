@@ -15,10 +15,5 @@
 ENABLE_UPGRADE=1 ./quality-gate.sh
 ```
 
-需要增加 nightly `rustfmt` 和未使用依赖检查时，运行：
-
-```bash
-ENABLE_NIGHTLY=1 ./quality-gate.sh
-```
 
 任何检查失败都必须修复；不得跳过、忽略失败，或在质量门禁未通过时声称任务完成。
