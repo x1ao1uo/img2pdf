@@ -62,7 +62,7 @@ printf 'script:    %s\n' "$script_dir/quality-gate.sh"
 printf 'workspace: %s\n' "$workspace_root"
 printf 'toolchain: %s\n' "$(rustc --version)"
 
-if [[ "${ENABLE_UPGRADE:-0}" == "1" ]]; then
+if [[ "${ENABLE_UPGRADE:-1}" == "1" ]]; then
     require_cargo_command upgrade
     run "$cargo_bin" upgrade \
         --incompatible allow \
