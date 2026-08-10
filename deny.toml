@@ -1,4 +1,16 @@
 [advisories]
+# unmaintained：只对工作区直接依赖报警。
+# 传递依赖（gtk-rs / unic-* / paste / proc-macro-error / encoding / rustls-pemfile 等）
+# 由上游库引入，我们无法单独替换；它们衡量的是上游活跃度，不是本仓库的代码质量。
+unmaintained = "workspace"
+
+ignore = [
+    # RUSTSEC-2023-0071 — rsa crate 的 Marvin Attack（RSA 解密时序侧信道）
+    # 官方结论："No safe upgrade is available!"（RustCrypto/RSA#626，至今无修复版本）
+    # 本地全部经 russh / makiko / rbdc-mysql / jsonwebtoken 传递引入，无法单独替换。
+    # 复查日期：2026-11-01（届时确认 RustCrypto 是否已发布修复版）
+    "RUSTSEC-2023-0071",
+]
 
 [licenses]
 allow = [
