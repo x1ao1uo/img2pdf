@@ -32,6 +32,11 @@ require_cargo_command() {
 
 test -f "$manifest" || fail "Cargo.toml not found next to quality-gate.sh"
 require_command "$cargo_bin"
+require_command rustc
+
+rustc_release="$(rustc -vV | sed -n 's/^release: //p')"
+[[ "$rustc_release" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+    fail "stable Rust is required; found release: ${rustc_release:-unknown}"
 
 workspace_manifest="$(
     "$cargo_bin" locate-project \
@@ -62,13 +67,16 @@ printf 'script:    %s\n' "$script_dir/quality-gate.sh"
 printf 'workspace: %s\n' "$workspace_root"
 printf 'toolchain: %s\n' "$(rustc --version)"
 
-if [[ "${ENABLE_UPGRADE:-1}" == "1" ]]; then
-    require_cargo_command upgrade
-    run "$cargo_bin" upgrade \
-        --incompatible allow \
-        --pinned allow \
-        --recursive true
-    run "$cargo_bin" update
+require_cargo_command upgrade
+run "$cargo_bin" upgrade \
+    --compatible allow \
+    --incompatible allow \
+    --pinned allow \
+    --recursive true
+run "$cargo_bin" update
+
+if [[ "${CARGO_CLEAN:-0}" == "1" ]]; then
+    run "$cargo_bin" clean --manifest-path "$workspace_manifest"
 fi
 
 test -f "$workspace_root/Cargo.lock" ||
@@ -92,10 +100,26 @@ run "$cargo_bin" clippy \
     --manifest-path "$workspace_manifest" \
     --workspace \
     --all-targets \
+    "${locked[@]}" \
+    -- \
+    -D warnings
+
+run "$cargo_bin" clippy \
+    --manifest-path "$workspace_manifest" \
+    --workspace \
+    --all-targets \
     --all-features \
     "${locked[@]}" \
     -- \
     -D warnings
+
+run "$cargo_bin" test \
+    --manifest-path "$workspace_manifest" \
+    --workspace \
+    --all-targets \
+    "${locked[@]}" \
+    -- \
+    --test-threads=1
 
 run "$cargo_bin" test \
     --manifest-path "$workspace_manifest" \
@@ -138,11 +162,16 @@ else
     printf '\n----- rustdoc (skipped: no library target) -----\n'
 fi
 
+project_gate="$workspace_root/scripts/quality-gate-project.sh"
+if [[ -f "$project_gate" ]]; then
+    run bash "$project_gate"
+fi
+
 require_cargo_command audit
 printf '\n----- cargo audit -----\n'
 if ! "$cargo_bin" audit; then
     echo "cargo audit online refresh failed; retrying with cached advisory database" >&2
-    "$cargo_bin" audit --no-fetch || echo "WARN: cargo audit found vulnerabilities or warnings (see above); continuing" >&2
+    "$cargo_bin" audit --no-fetch || fail "cargo audit found vulnerabilities or warnings (see above)"
 fi
 
 if [[ -f "$workspace_root/deny.toml" ]]; then
