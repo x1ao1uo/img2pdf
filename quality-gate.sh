@@ -67,13 +67,17 @@ printf 'script:    %s\n' "$script_dir/quality-gate.sh"
 printf 'workspace: %s\n' "$workspace_root"
 printf 'toolchain: %s\n' "$(rustc --version)"
 
-require_cargo_command upgrade
-run "$cargo_bin" upgrade \
-    --compatible allow \
-    --incompatible allow \
-    --pinned allow \
-    --recursive true
-run "$cargo_bin" update
+if [[ "${UPGRADE:-0}" == "1" ]]; then
+    require_cargo_command upgrade
+    run "$cargo_bin" upgrade \
+        --compatible allow \
+        --incompatible allow \
+        --pinned allow \
+        --recursive true
+    run "$cargo_bin" update
+else
+    printf '\n----- cargo upgrade + update (skipped: set UPGRADE=1 to enable) -----\n'
+fi
 
 if [[ "${CARGO_CLEAN:-0}" == "1" ]]; then
     run "$cargo_bin" clean --manifest-path "$workspace_manifest"
