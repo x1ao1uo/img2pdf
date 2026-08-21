@@ -1,6 +1,11 @@
 //! PDF 模块，负责 PDF 文档生成与页面组织。
 //!
-//! 本模块中的注释使用中文描述用途、参数和返回值，便于维护。
+//! 主要能力：
+//! 1. 通过 `A4GridLayout` 在 A4 页面（默认 595×842 pt）上划分 2×2 四宫格；
+//! 2. 使用 `fit_rect` 等比缩放图片到目标槽位内并居中；
+//! 3. 通过 `printpdf` 把图片嵌入 XObject 并写出单页 PDF（最多 4 张）。
+//!
+//! 单位约定：内部计算用 pt（磅），最终转换到 mm 写入 PDF。
 
 use std::error::Error;
 use std::fs;
@@ -9,45 +14,47 @@ use std::path::Path;
 use ::image::GenericImageView;
 use printpdf::{Mm, Op, PdfDocument, PdfPage, PdfSaveOptions, Pt, RawImage, XObjectTransform};
 
+/// 单页最大图片数，与 A4GridLayout 的 2×2 网格一一对应。
 const IMAGES_PER_PAGE: usize = 4;
 
+/// 二维矩形（pt 单位），用于描述页面内的图片槽位。
 #[derive(Debug, Clone, Copy)]
-/// `Rect` 结构体，保存当前模块相关业务数据。
 pub struct Rect {
-    /// `x` 字段，存储对应业务数据。
+    /// 左下角 x 坐标。
     pub x: f32,
-    /// `y` 字段，存储对应业务数据。
+    /// 左下角 y 坐标（PDF 坐标系原点在左下）。
     pub y: f32,
-    /// `w` 字段，存储对应业务数据。
+    /// 矩形宽度。
     pub w: f32,
-    /// `h` 字段，存储对应业务数据。
+    /// 矩形高度。
     pub h: f32,
 }
 
+/// 图片的原始像素尺寸（取自 `image` crate 的 dimensions）。
 #[derive(Debug, Clone, Copy)]
-/// `ImageSize` 结构体，保存当前模块相关业务数据。
 pub struct ImageSize {
-    /// `w` 字段，存储对应业务数据。
+    /// 图片宽度（像素）。
     pub w: f32,
-    /// `h` 字段，存储对应业务数据。
+    /// 图片高度（像素）。
     pub h: f32,
 }
 
+/// A4 网格布局参数。
 #[derive(Debug, Clone, Copy)]
-/// `LayoutOptions` 结构体，保存当前模块相关业务数据。
 pub struct LayoutOptions {
-    /// `page_width` 字段，存储对应业务数据。
+    /// 页面宽度（pt）。
     pub page_width: f32,
-    /// `page_height` 字段，存储对应业务数据。
+    /// 页面高度（pt）。
     pub page_height: f32,
-    /// `margin` 字段，存储对应业务数据。
+    /// 页面四周边距（pt）。
     pub margin: f32,
-    /// `gap` 字段，存储对应业务数据。
+    /// 网格之间的水平/垂直间隙（pt）。
     pub gap: f32,
 }
 
 impl Default for LayoutOptions {
     fn default() -> Self {
+        // 595×842 pt 对应 A4；24/12 pt 为常见的留白与间隙
         Self {
             page_width: 595.0,
             page_height: 842.0,
@@ -57,31 +64,29 @@ impl Default for LayoutOptions {
     }
 }
 
-/// `A4GridLayout` 结构体，保存当前模块相关业务数据。
+/// A4 2×2 网格布局：基于 `LayoutOptions` 计算四个图片槽位。
 pub struct A4GridLayout {
     options: LayoutOptions,
 }
 
 impl A4GridLayout {
-    /// 创建新的实例。
-    ///
-    /// # 参数
-    /// - `options`: 函数签名中定义的业务参数。
-    ///
-    /// # 返回
-    /// 返回 `Self`，错误时按函数签名中的错误类型向上透传。
+    /// 使用给定的布局参数构造实例，参数会被 `normalize_layout_options` 规整化。
     pub fn new(options: LayoutOptions) -> Self {
         Self {
             options: normalize_layout_options(options),
         }
     }
 
-    /// 执行 `image_slots` 操作，封装当前模块的业务流程。
+    /// 计算 A4 页面上四个等大的图片槽位。
     ///
-    /// # 返回
-    /// 返回 `[Rect`，错误时按函数签名中的错误类型向上透传。
+    /// 返回数组顺序对应页面：
+    /// - `[0]` 左上
+    /// - `[1]` 右上
+    /// - `[2]` 左下
+    /// - `[3]` 右下
     pub fn image_slots(&self) -> [Rect; IMAGES_PER_PAGE] {
         let options = self.options;
+        // 每个槽位的宽/高：扣除两侧 margin 后再扣掉 gap，再除以 2
         let slot_width = (2.0f32.mul_add(-options.margin, options.page_width) - options.gap) / 2.0;
         let slot_height =
             (2.0f32.mul_add(-options.margin, options.page_height) - options.gap) / 2.0;
@@ -115,13 +120,9 @@ impl A4GridLayout {
     }
 }
 
-/// 执行 `fit_rect` 操作，封装当前模块的业务流程。
+/// 等比缩放 `size` 到 `box` 内部并居中，返回实际放置的矩形。
 ///
-/// # 参数
-/// - `size`: 函数签名中定义的业务参数。
-///
-/// # 返回
-/// 返回 `Rect`，错误时按函数签名中的错误类型向上透传。
+/// 当任一维度非正时返回零尺寸矩形，方便上层跳过绘制。
 pub fn fit_rect(size: ImageSize, r#box: Rect) -> Rect {
     if size.w <= 0.0 || size.h <= 0.0 || r#box.w <= 0.0 || r#box.h <= 0.0 {
         return Rect {
@@ -132,6 +133,7 @@ pub fn fit_rect(size: ImageSize, r#box: Rect) -> Rect {
         };
     }
 
+    // 取最小缩放比，保证整张图片完整放入槽位
     let scale = f32::min(r#box.w / size.w, r#box.h / size.h);
     let width = size.w * scale;
     let height = size.h * scale;
@@ -144,6 +146,7 @@ pub fn fit_rect(size: ImageSize, r#box: Rect) -> Rect {
     }
 }
 
+/// 规整化布局参数：非正值用默认值代替，避免下游除零或负尺寸。
 fn normalize_layout_options(options: LayoutOptions) -> LayoutOptions {
     let defaults = LayoutOptions::default();
     LayoutOptions {
@@ -170,10 +173,12 @@ fn normalize_layout_options(options: LayoutOptions) -> LayoutOptions {
     }
 }
 
+/// pt -> mm 转换（1 in = 72 pt = 25.4 mm）。
 fn pt_to_mm(pt: f32) -> Mm {
     Mm(pt * 25.4 / 72.0)
 }
 
+/// 读取图片真实像素尺寸（不解码全图，只读取头部）。
 fn get_image_size(path: &Path) -> Result<ImageSize, Box<dyn Error>> {
     let img = ::image::open(path)?;
     let (width, height) = img.dimensions();
@@ -183,19 +188,25 @@ fn get_image_size(path: &Path) -> Result<ImageSize, Box<dyn Error>> {
     })
 }
 
+/// 取第一页能容纳的图片切片（最多 `IMAGES_PER_PAGE` 张），剩余图片忽略。
 fn first_page_images<T>(image_paths: &[T]) -> &[T] {
     &image_paths[..usize::min(image_paths.len(), IMAGES_PER_PAGE)]
 }
 
-/// 执行 `write_image_grid_pdf` 操作，封装当前模块的业务流程。
+/// 把一个图片分组按 A4 四宫格写入单页 PDF。
 ///
 /// # 参数
-/// - `output_path`: 函数签名中定义的业务参数。
-/// - `_title`: 函数签名中定义的业务参数。
-/// - `image_paths`: 函数签名中定义的业务参数。
+/// - `output_path`: 输出 PDF 路径，必要时自动创建父目录。
+/// - `_title`: 预留的标题参数（当前未写入 PDF）。
+/// - `image_paths`: 待写入的图片路径列表，最多取前 4 张。
+///
+/// # 行为
+/// - 列表为空时返回错误；
+/// - 每张图片通过 `RawImage::decode_from_bytes` 解码后作为 XObject 嵌入；
+/// - 坐标系使用 PDF 的 pt 单位，并通过 `0.75` 系数把像素 96 DPI 映射回 pt。
 ///
 /// # 返回
-/// 返回 `Result<(), Box<dyn Error>>`，错误时按函数签名中的错误类型向上透传。
+/// 成功时返回 `Ok(())`，错误向上透传为 `Box<dyn Error>`。
 pub fn write_image_grid_pdf(
     output_path: &Path,
     _title: &str,
@@ -205,6 +216,7 @@ pub fn write_image_grid_pdf(
         return Err(format!("no images to write for {_title}").into());
     }
 
+    // 确保输出目录存在
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -217,6 +229,7 @@ pub fn write_image_grid_pdf(
     let mut doc = PdfDocument::new("img2pdf");
     let mut page_ops: Vec<Op> = Vec::new();
 
+    // 遍历第一页图片，按槽位布局插入
     for (index, image_path) in first_page_images(image_paths).iter().enumerate() {
         let image_path = image_path.as_ref();
         let slot = slots[index];
@@ -233,6 +246,7 @@ pub fn write_image_grid_pdf(
         page_ops.push(Op::UseXobject {
             id: image_xobject_id,
             transform: XObjectTransform {
+                // 0.75 = 72/96，把像素按 96 DPI 转回 PDF 的 pt 单位
                 translate_x: Some(Pt(fit.x * 0.75)),
                 translate_y: Some(Pt(fit.y * 0.75)),
                 scale_x: Some(fit.w / img_size.w),
@@ -247,6 +261,7 @@ pub fn write_image_grid_pdf(
     let mut warnings = Vec::new();
     let pdf_bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
 
+    // 输出 PDF 库的告警（一般是字体/编码相关，不致命）
     if !warnings.is_empty() {
         eprintln!("PDF 生成警告: {warnings:?}");
     }
@@ -263,6 +278,7 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    /// 简单的临时目录封装，在 Drop 时自动清理。
     struct TempDir {
         path: PathBuf,
     }
@@ -290,11 +306,13 @@ mod tests {
         }
     }
 
+    /// 写入一个固定颜色的 8x8 PNG 作为测试图片。
     fn write_test_png(path: &Path, color: [u8; 3]) {
         let image = ImageBuffer::from_pixel(8, 8, Rgb(color));
         image.save(path).expect("test PNG should be written");
     }
 
+    /// 验证：A4GridLayout 默认参数下始终返回 4 个槽位。
     #[test]
     fn a4_grid_layout_always_has_four_slots() {
         let layout = A4GridLayout::new(LayoutOptions::default());
@@ -302,6 +320,7 @@ mod tests {
         assert_eq!(layout.image_slots().len(), 4);
     }
 
+    /// 验证：`first_page_images` 对超过 4 张的输入只取前 4 张。
     #[test]
     fn first_page_images_uses_at_most_four_images() {
         let images = [1, 2, 3, 4, 5];
@@ -309,6 +328,7 @@ mod tests {
         assert_eq!(first_page_images(&images), &[1, 2, 3, 4]);
     }
 
+    /// 验证：`first_page_images` 对不足 4 张的输入按原样返回。
     #[test]
     fn first_page_images_keeps_short_input_for_empty_slots() {
         let images = [1, 2];
@@ -316,6 +336,7 @@ mod tests {
         assert_eq!(first_page_images(&images), &[1, 2]);
     }
 
+    /// 验证：超过 4 张图片时也只生成一页，且嵌入 4 个 XObject。
     #[test]
     fn write_image_grid_pdf_uses_one_page_for_more_than_four_images() {
         let temp = TempDir::new("one-page");
@@ -340,6 +361,7 @@ mod tests {
         );
     }
 
+    /// 验证：仅 1 张图片时仍正常生成单页 PDF，剩余槽位留空。
     #[test]
     fn write_image_grid_pdf_keeps_empty_slots_when_only_one_image_exists() {
         let temp = TempDir::new("one-image");
