@@ -1,6 +1,6 @@
 # Rust Project Agent Rules
 
-<!-- rust-quality-gate-policy:v3 -->
+<!-- rust-quality-gate-policy:v4 -->
 ## Rust 质量门禁
 
 本目录中的代码、依赖、配置或构建脚本发生任何变更后，提交或交付前必须运行并通过：

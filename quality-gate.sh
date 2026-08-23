@@ -155,12 +155,14 @@ run "$cargo_bin" clippy \
     -D warnings
 
 # 4. 测试：nextest（进程级隔离，防测试间共享资源互相污染），
-#    默认 features + all-features 各一遍
+#    默认 features + all-features 各一遍。
+#    --no-tests=pass：工具型 bin 项目可以暂时没有测试（lint/audit 等硬检查依然卡）。
 require_cargo_command nextest
 run "$cargo_bin" nextest run \
     --manifest-path "$workspace_manifest" \
     --workspace \
     --all-targets \
+    --no-tests=pass \
     "${locked[@]}"
 
 run "$cargo_bin" nextest run \
@@ -168,6 +170,7 @@ run "$cargo_bin" nextest run \
     --workspace \
     --all-targets \
     --all-features \
+    --no-tests=pass \
     "${locked[@]}"
 
 # 5. 文档测试（有 lib/rlib/proc-macro target 时；纯 cdylib/staticlib 不支持）
