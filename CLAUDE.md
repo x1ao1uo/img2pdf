@@ -1,19 +1,3 @@
 # Rust Project Instructions
 
-<!-- rust-quality-gate-policy:v3 -->
-## Rust 质量门禁
-
-本目录中的代码、依赖、配置或构建脚本发生任何变更后，提交或交付前必须运行并通过：
-
-```bash
-./quality-gate.sh
-```
-
-需要把所有直接依赖、固定版本依赖和传递依赖升级到 Cargo 当前可解析的最新版时，运行：
-
-```bash
-ENABLE_UPGRADE=1 ./quality-gate.sh
-```
-
-
-任何检查失败都必须修复；不得跳过、忽略失败，或在质量门禁未通过时声称任务完成。
+读取并严格遵守同目录 `AGENTS.md` 及目录级 `../agents/AGENTS.md` 的「Rust 项目公共规则」节(质量门禁、cargo 验证命令、依赖与 lint 纪律等)。
