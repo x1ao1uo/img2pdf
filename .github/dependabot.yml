@@ -1,0 +1,20 @@
+# Dependabot — automated dependency updates.
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    groups:
+      all-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    labels: ["deps/cargo", "auto-update"]
+    commit-message:
+      prefix: "deps"
+      include: "scope"
